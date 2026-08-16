@@ -1,0 +1,273 @@
+Build a simple Todo REST API using FastAPI, PostgreSQL, and SQLModel.
+
+IMPORTANT ARCHITECTURE REQUIREMENT:
+Use Hexagonal Architecture (Ports and Adapters) with a functional programming style.
+
+Do NOT use service/repository classes for the application/domain logic.
+Prefer functions, immutable data transformations, dependency injection through function arguments, and pure functions wherever possible.
+
+Tech stack:
+- Python 3.12+
+- FastAPI
+-  neon PostgreSQL
+- SQLModel
+- Pydantic
+- psycopg
+- pytest
+
+Requirements:
+
+
+
+2. Domain layer
+
+Keep the domain independent of FastAPI, SQLModel, and PostgreSQL.
+
+Use TypedDict or another lightweight functional data representation instead of domain classes.
+
+Create:
+
+Todo:
+- id: UUID
+- title: str
+- description: str | None
+- completed: bool
+
+Create pure functions such as:
+
+create_todo(title, description)
+update_todo(todo, title, description, completed)
+
+These functions should not perform database operations or mutate existing data.
+
+For update_todo(), return a new Todo rather than modifying the existing Todo.
+
+
+
+
+4. Application layer
+
+Create functional use cases:
+
+create_todo_use_case()
+get_todos_use_case()
+get_todo_use_case()
+update_todo_use_case()
+delete_todo_use_case()
+
+Inject repository functions into the use cases as function arguments.
+
+Example concept:
+
+def create_todo_use_case(
+    save_todo,
+    title,
+    description,
+):
+    todo = create_todo(title, description)
+    return save_todo(todo)
+
+The use-case layer must NOT import SQLModel, FastAPI, or PostgreSQL.
+
+
+5. PostgreSQL adapter
+
+Use SQLModel only inside the PostgreSQL adapter.
+
+Create a SQLModel table model:
+
+TodoModel:
+- id UUID primary key
+- title
+- description
+- completed
+
+Implement repository functions:
+
+create_todo_repository()
+get_all_todos_repository()
+get_todo_repository()
+update_todo_repository()
+delete_todo_repository()
+
+These functions should accept a SQLModel Session where required.
+
+Create conversion functions:
+
+to_domain(model)
+to_model(todo)
+
+The domain Todo must remain independent of SQLModel.
+
+
+6. Database
+
+Create infrastructure/database.py.
+
+Use:
+
+SQLModel
+Session
+create_engine
+
+Use an environment variable:
+
+DATABASE_URL
+
+Example:
+
+postgresql+psycopg://postgres:password@localhost:5432/todo_db
+
+Do not hardcode the real password.
+
+Create:
+
+get_session()
+
+and:
+
+create_tables()
+
+
+7. FastAPI adapter
+
+Create REST endpoints:
+
+POST   /todos
+GET    /todos
+GET    /todos/{todo_id}
+PUT    /todos/{todo_id}
+DELETE /todos/{todo_id}
+
+Use Pydantic request models for HTTP input.
+
+The FastAPI router should be an inbound adapter.
+
+It should:
+- receive HTTP requests
+- validate input
+- inject repository functions
+- call the functional use case
+- convert the result to an HTTP response
+- handle appropriate errors
+
+Do not put business logic inside the router.
+
+
+8. Dependency injection
+
+Use FastAPI Depends() only at the infrastructure/adapter boundary.
+
+For example, create repository functions using the current database session:
+
+save_todo = lambda todo: create_todo_repository(session, todo)
+
+Then pass that function into the use case.
+
+Keep the use case unaware of FastAPI and SQLModel.
+
+
+9. Functional programming requirements
+
+Follow these rules:
+
+- Prefer functions over classes.
+- Avoid mutable global state.
+- Avoid domain classes.
+- Avoid service classes.
+- Avoid repository classes.
+- Keep domain functions pure.
+- Do not mutate domain objects.
+- Return new data structures when changing state.
+- Inject side effects as functions.
+- Keep database operations at the adapter boundary.
+- Keep HTTP operations at the adapter boundary.
+- Use type hints everywhere.
+- Use small composable functions.
+
+
+10. Testing
+
+Create unit tests for the pure domain functions.
+
+Test:
+- create_todo()
+- update_todo()
+
+Also test application use cases using fake functions instead of PostgreSQL.
+
+For example:
+
+def fake_save_todo(todo):
+    return todo
+
+Do not require PostgreSQL for unit tests.
+
+The tests should demonstrate why functional dependency injection makes the application easy to test.
+
+
+11. Docker
+
+Create docker-compose.yml with PostgreSQL.
+
+Use:
+- postgres image
+- database: todo_db
+- username: postgres
+- password: password
+- port: 5432
+
+Use environment variables where appropriate.
+
+
+12. README
+
+Create a README explaining:
+
+- What Hexagonal Architecture means
+- What a Port is
+- What an Adapter is
+- What the Domain is
+- What the Application/Use Case layer is
+- Why SQLModel is isolated from the domain
+- Why FastAPI is an inbound adapter
+- Why PostgreSQL/SQLModel is an outbound adapter
+- How functional programming is being used
+- Request flow
+
+Show this architecture diagram:
+
+HTTP Client
+    ↓
+FastAPI Router
+    ↓
+Functional Use Case
+    ↓
+Repository Port (Callable)
+    ↓
+SQLModel Repository Adapter
+    ↓
+PostgreSQL
+
+
+13. Code quality
+
+Use clean, beginner-friendly Python.
+
+Use explicit type hints.
+
+Add docstrings where they help understanding.
+
+Do not over-engineer the project.
+
+Do not add unnecessary abstractions.
+
+After implementing everything:
+
+1. Show me the complete project tree.
+2. Explain each file.
+3. Explain one POST /todos request step-by-step from HTTP request → FastAPI → use case → port → adapter → PostgreSQL.
+4. Explain where the functional programming is being used.
+5. Explain why this is Hexagonal Architecture.
+6. Run the tests and fix any errors.
+7. Verify that the FastAPI application starts successfully.
